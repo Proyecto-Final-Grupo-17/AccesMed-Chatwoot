@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Genera .env a partir de .env.example con claves nuevas (Linux / servidor).
-# Uso:  ./scripts/generar-env.sh [URL_PUBLICA]
-#   ej: ./scripts/generar-env.sh https://chat.accesmed.com
-# Sin argumento deja FRONTEND_URL=http://localhost:3000
+# Uso:  ./scripts/generar-env.sh [URL_PUBLICA] [PUERTO]
+#   ej: ./scripts/generar-env.sh http://chat.accesmed.site 3100
+# Sin argumentos deja FRONTEND_URL=http://localhost:3000 y CHATWOOT_PORT=3000
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -27,6 +27,10 @@ poner POSTGRES_PASSWORD "$(openssl rand -hex 16)"
 if [ "${1:-}" != "" ]; then
   poner FRONTEND_URL "$1"
 fi
+if [ "${2:-}" != "" ]; then
+  case "$2" in *[!0-9]*) echo "El puerto tiene que ser un numero (ej. 3100)." >&2; rm -f .env; exit 1 ;; esac
+  poner CHATWOOT_PORT "$2"
+fi
 
-echo ".env generado con claves nuevas (FRONTEND_URL=$(grep '^FRONTEND_URL=' .env | cut -d= -f2-))."
+echo ".env generado con claves nuevas (FRONTEND_URL=$(grep '^FRONTEND_URL=' .env | cut -d= -f2-), CHATWOOT_PORT=$(grep '^CHATWOOT_PORT=' .env | cut -d= -f2-))."
 echo "Revisa SMTP_* si queres que Chatwoot envie mails."

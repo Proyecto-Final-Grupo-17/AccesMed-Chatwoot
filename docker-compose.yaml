@@ -1,9 +1,11 @@
-# Chatwoot Community Edition (CE) - instalacion local con Docker
+# Chatwoot Community Edition (CE) con Docker (local en Windows y servidor Linux)
 # Basado en referencia-oficial/docker-compose.production.yaml, con estos cambios:
 #   - Imagen CE fijada a una version (v4.18.0-ce) en lugar de chatwoot:latest
 #   - La contrasena de Postgres se toma del .env (una sola fuente de verdad)
 #   - Postgres expuesto en 127.0.0.1:5433 (no choca con un Postgres local en 5432)
 #   - Redis sin puerto publicado (solo lo usan los contenedores internamente)
+#   - Puerto de la web configurable con CHATWOOT_PORT del .env (por defecto 3000;
+#     en el servidor 3100, porque el 3000 es del front de prod de AccesMed)
 name: chatwoot
 
 x-chatwoot: &chatwoot
@@ -19,7 +21,7 @@ services:
       - postgres
       - redis
     ports:
-      - '127.0.0.1:3000:3000'
+      - '127.0.0.1:${CHATWOOT_PORT:-3000}:3000'
     environment:
       - NODE_ENV=production
       - RAILS_ENV=production
