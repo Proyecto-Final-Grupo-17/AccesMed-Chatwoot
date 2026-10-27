@@ -2,7 +2,7 @@
 
 Configuración para levantar Chatwoot CE (open source, sin licencia) con Docker.
 Repositorio: https://github.com/Proyecto-Final-Grupo-17/AccesMed-Chatwoot
-Versión: **v4.18.0-ce** · Local: **http://localhost:3000** · Servidor: **http://chat.accesmed.site**
+Versión: **v4.18.0-ce** · Local: **http://localhost:3000** · Servidor: **https://chat.accesmed.site**
 
 ## Requisitos
 
@@ -23,39 +23,55 @@ entrar a una misma instalación (el servidor, o la PC de alguien por red/túnel)
 
 > El `.env` tiene claves y contraseñas: **nunca se sube a git** (está en `.gitignore`).
 
-## Servidor (chat.accesmed.site)
+## Servidor (https://chat.accesmed.site)
 
 Chatwoot corre en el Cloud Server de DonWeb junto a AccesMed, en su propia carpeta
-(`/root/docker/chatwoot`). El Nginx del servidor recibe `chat.accesmed.site` y le pasa
-el tráfico a `127.0.0.1:3100` (el 3000 queda para el front de prod de AccesMed).
+(`/root/docker/chatwoot`). El Nginx del servidor recibe `chat.accesmed.site` por HTTPS y le
+pasa el tráfico a `127.0.0.1:3100` (el 3000 queda para el front de prod de AccesMed).
+El certificado es un **Sectigo PositiveSSL** comprado en DonWeb para `chat.accesmed.site`.
 
-**Primera instalación** (por SSH, como root):
+### Primera instalación (por SSH, como root)
 
 ```bash
 cd /root/docker
 git clone https://github.com/Proyecto-Final-Grupo-17/AccesMed-Chatwoot.git chatwoot
 cd chatwoot
-./scripts/generar-env.sh http://chat.accesmed.site 3100   # .env con claves nuevas
+./scripts/generar-env.sh https://chat.accesmed.site 3100   # .env con claves nuevas
 ./scripts/levantar-servidor.sh                              # pull, base de datos y arranque
 ```
 
-Después, **antes de publicarlo**, crear la cuenta de administrador por un túnel SSH
-(así nadie más puede crearla primero): desde tu PC,
-`ssh -p <puerto-ssh> -N -L 3100:127.0.0.1:3100 root@<ip-del-servidor>`, entrar a
-http://localhost:3100 y completar el formulario. Recién ahí publicar el sitio:
+1. **Crear la cuenta de administrador antes de publicar** (así nadie más puede crearla
+   primero), por un túnel SSH desde tu PC:
+   `ssh -p <puerto-ssh> -N -L 3100:127.0.0.1:3100 root@<ip-del-servidor>`, entrar a
+   http://localhost:3100 y completar el formulario.
+2. **Instalar el certificado**: en DonWeb, *Certificados SSL → Gestionar*, descargar el
+   certificado (CRT), la clave privada (KEY) y el certificado intermedio; subirlos con
+   `scp -P <puerto-ssh> chat.crt chat.key intermedio.crt root@<ip-del-servidor>:/root/` y:
+   ```bash
+   ./scripts/instalar-certificado.sh /root/chat.crt /root/chat.key /root/intermedio.crt
+   rm /root/chat.crt /root/chat.key /root/intermedio.crt
+   ```
+   El script verifica que el certificado sea del dominio y que la clave corresponda, y lo
+   deja en `/etc/ssl/chat.accesmed.site/` (`fullchain.crt` + `privkey.key`).
+3. **Publicar el sitio**:
+   ```bash
+   cp deploy/nginx/chat.accesmed.site.conf /etc/nginx/sites-available/chat.accesmed.site
+   ln -sf /etc/nginx/sites-available/chat.accesmed.site /etc/nginx/sites-enabled/
+   nginx -t && systemctl reload nginx
+   ```
 
-```bash
-cp deploy/nginx/chat.accesmed.site.conf /etc/nginx/sites-available/chat.accesmed.site
-ln -sf /etc/nginx/sites-available/chat.accesmed.site /etc/nginx/sites-enabled/
-nginx -t && systemctl reload nginx
-```
+### Renovar el certificado
 
-**Actualizar** (nueva versión o cambios del repo): `git pull` y `./scripts/levantar-servidor.sh`.
-Si cambia algo del `.env`, editarlo y `docker compose up -d`.
+El certificado actual **vence el 13/05/2027** (el plan de DonWeb dura más: se reemite dentro
+del mismo plan). Antes del vencimiento: en DonWeb reemitirlo para `chat.accesmed.site`
+(validación por Registro DNS), descargar los 3 archivos, subirlos con `scp` y correr
+`./scripts/instalar-certificado.sh` como en el paso 2. Los archivos anteriores quedan
+como copia `*.bak-<fecha>` en `/etc/ssl/chat.accesmed.site/`.
 
-**HTTPS** (pendiente): `apt install -y certbot python3-certbot-nginx`,
-`certbot --nginx -d chat.accesmed.site`, y en el `.env` poner
-`FRONTEND_URL=https://chat.accesmed.site` + `docker compose up -d`.
+### Actualizar Chatwoot
+
+`git pull` y `./scripts/levantar-servidor.sh`. Si cambió `deploy/nginx/chat.accesmed.site.conf`,
+volver a copiarlo como en el paso 3. Si cambia algo del `.env`, editarlo y `docker compose up -d`.
 
 ## Uso
 
@@ -80,7 +96,8 @@ Super Admin de tu instalación; desde ahí creás agentes, bandejas (inboxes), e
 - `.env` — configuración con las **claves secretas de cada instalación**. No se sube ni se comparte.
 - `scripts/generar-env.ps1` / `scripts/generar-env.sh` — generan el `.env` con claves nuevas (Windows / Linux).
 - `scripts/levantar-servidor.sh` — instala o actualiza Chatwoot en el servidor Linux.
-- `deploy/nginx/chat.accesmed.site.conf` — sitio de Nginx del servidor para `chat.accesmed.site`.
+- `scripts/instalar-certificado.sh` — instala o renueva el certificado SSL de `chat.accesmed.site` en el servidor.
+- `deploy/nginx/chat.accesmed.site.conf` — sitio de Nginx del servidor para `chat.accesmed.site` (HTTPS).
 - `referencia-oficial/` — plantillas originales de Chatwoot, para comparar al actualizar.
 
 Los datos viven en volúmenes de Docker (`chatwoot_postgres_data`, `chatwoot_storage_data`,
@@ -96,8 +113,8 @@ Los datos viven en volúmenes de Docker (`chatwoot_postgres_data`, `chatwoot_sto
   Para habilitarlo completá las variables `SMTP_*` del `.env` (por ejemplo con una cuenta de Gmail y
   contraseña de aplicación) y reiniciá con `docker compose up -d`.
 - **Canales:** de forma local funcionan el widget de chat web, la API y el email. WhatsApp,
-  Facebook, Instagram, Telegram, etc. necesitan una URL pública con HTTPS (dominio + Nginx,
-  o un túnel como Cloudflare Tunnel / ngrok).
+  Facebook, Instagram, Telegram, etc. necesitan una URL pública con HTTPS: se conectan en
+  la instalación del servidor (https://chat.accesmed.site).
 
 ## Acceder desde otras PCs de la red
 
