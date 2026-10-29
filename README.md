@@ -53,12 +53,25 @@ cd chatwoot
    ```
    El script verifica que el certificado sea del dominio y que la clave corresponda, y lo
    deja en `/etc/ssl/chat.accesmed.site/` (`fullchain.crt` + `privkey.key`).
-3. **Publicar el sitio**:
+3. **Publicar el sitio** (Nginx + páginas públicas):
    ```bash
-   cp deploy/nginx/chat.accesmed.site.conf /etc/nginx/sites-available/chat.accesmed.site
-   ln -sf /etc/nginx/sites-available/chat.accesmed.site /etc/nginx/sites-enabled/
-   nginx -t && systemctl reload nginx
+   ./scripts/publicar-sitio.sh
    ```
+   Instala `deploy/nginx/chat.accesmed.site.conf`, copia `deploy/publico/` a
+   `/var/www/chat.accesmed.site/`, prueba la configuración y recarga Nginx. Si `nginx -t`
+   falla, deja la configuración anterior.
+
+### Política de privacidad (para la app de Meta / WhatsApp)
+
+Meta exige una política de privacidad pública para pasar la app a modo *Live* (sin eso
+solo llegan los webhooks de prueba). Está en `deploy/publico/privacidad/` y Nginx la sirve
+directo, sin pasar por Chatwoot:
+
+- Política de privacidad: https://chat.accesmed.site/privacidad/
+- Eliminación de datos: https://chat.accesmed.site/privacidad/#eliminacion-de-datos
+
+Para cambiarla: editar `deploy/publico/privacidad/index.html` (y la fecha de "Última
+actualización"), subir el cambio y en el servidor `git pull && ./scripts/publicar-sitio.sh`.
 
 ### Renovar el certificado
 
@@ -70,8 +83,8 @@ como copia `*.bak-<fecha>` en `/etc/ssl/chat.accesmed.site/`.
 
 ### Actualizar Chatwoot
 
-`git pull` y `./scripts/levantar-servidor.sh`. Si cambió `deploy/nginx/chat.accesmed.site.conf`,
-volver a copiarlo como en el paso 3. Si cambia algo del `.env`, editarlo y `docker compose up -d`.
+`git pull` y `./scripts/levantar-servidor.sh`. Si cambió algo en `deploy/` (Nginx o la
+política de privacidad), correr también `./scripts/publicar-sitio.sh`. Si cambia algo del `.env`, editarlo y `docker compose up -d`.
 
 ## Uso
 
@@ -97,7 +110,9 @@ Super Admin de tu instalación; desde ahí creás agentes, bandejas (inboxes), e
 - `scripts/generar-env.ps1` / `scripts/generar-env.sh` — generan el `.env` con claves nuevas (Windows / Linux).
 - `scripts/levantar-servidor.sh` — instala o actualiza Chatwoot en el servidor Linux.
 - `scripts/instalar-certificado.sh` — instala o renueva el certificado SSL de `chat.accesmed.site` en el servidor.
+- `scripts/publicar-sitio.sh` — instala el sitio de Nginx y las páginas públicas en el servidor.
 - `deploy/nginx/chat.accesmed.site.conf` — sitio de Nginx del servidor para `chat.accesmed.site` (HTTPS).
+- `deploy/publico/privacidad/` — política de privacidad pública (https://chat.accesmed.site/privacidad/).
 - `referencia-oficial/` — plantillas originales de Chatwoot, para comparar al actualizar.
 
 Los datos viven en volúmenes de Docker (`chatwoot_postgres_data`, `chatwoot_storage_data`,
